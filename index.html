@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Budget Planner (MYR) — Monthly</title>
+  <style>
+    :root{
+      --bg:#0b1020; --card:#121a33; --text:#e9eeff; --muted:#a9b3d6;
+      --line:rgba(255,255,255,.10); --good:#34d399; --bad:#fb7185; --warn:#fbbf24;
+      --input:rgba(255,255,255,.06);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: radial-gradient(1200px 600px at 10% 10%, #16214a 0%, var(--bg) 55%);
+      color:var(--text);
+    }
+    header{max-width:1200px;margin:0 auto;padding:22px 16px 10px}
+    h1{margin:0 0 6px;font-size:20px}
+    p{margin:0;color:var(--muted);font-size:13px}
+
+    .wrap{max-width:1200px;margin:0 auto;padding:16px;display:grid;gap:14px}
+
+    .topbar{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
+      border:1px solid var(--line); background:rgba(255,255,255,.04);
+      border-radius:14px; padding:12px;
+    }
+    .topbar-left{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .topbar-right{display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:flex-end}
+    .label{color:var(--muted);font-size:12px}
+
+    select,input[type="month"],input[type="text"],input[type="number"]{
+      padding:8px 10px; border-radius:10px; border:1px solid var(--line);
+      background:var(--input); color:var(--text); outline:none;
+    }
+    input[type="number"]{text-align:right}
+    select:focus,input:focus{border-color:rgba(96,165,250,.75)}
+
+    .btn{
+      appearance:none; border:1px solid var(--line); background:rgba(255,255,255,.06);
+      color:var(--text); padding:9px 12px; border-radius:10px; cursor:pointer;
+      font-size:13px;
+    }
+    .btn:hover{border-color:rgba(96,165,250,.7)}
+    .btn-danger:hover{border-color:rgba(251,113,133,.8)}
+    .btn-small{padding:7px 9px;font-size:12px}
+
+    .card{
+      background: rgba(18,26,51,.85);
+      border:1px solid var(--line);
+      border-radius:14px; padding:14px;
+      backdrop-filter: blur(6px);
+    }
+    .card h2{
+      margin:0 0 10px;font-size:13px;color:var(--muted);
+      letter-spacing:.08em;text-transform:uppercase
+    }
+
+    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    @media(max-width:900px){.summary{grid-template-columns:repeat(2,1fr)}}
+    .pill{border:1px solid var(--line); background:rgba(255,255,255,.04); border-radius:14px; padding:12px}
+    .pill .value{font-size:18px;font-weight:700;margin-top:4px}
+    .value.good{color:var(--good)} .value.warn{color:var(--warn)} .value.bad{color:var(--bad)}
+
+    .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+    @media(max-width:1100px){.grid{grid-template-columns:1fr}}
+
+    table{width:100%;border-collapse:collapse;border-radius:10px;overflow:hidden}
+    th,td{padding:9px 8px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:middle}
+    th{color:var(--muted);font-weight:600;text-align:left}
+    tr:last-child td{border-bottom:none}
+    .num{text-align:right;white-space:nowrap}
+    .totals td{font-weight:700}
+
+    .row-3{display:grid;grid-template-columns:1.4fr .8fr auto;gap:8px}
+
+    /* Add expense row: name + category + amount + add */
+    .row-exp-add{display:grid;grid-template-columns:1.1fr 1fr .7fr auto;gap:8px}
+    @media(max-width:520px){ .row-exp-add{grid-template-columns:1fr} }
+
+    /* Expense row category cell: dropdown + optional custom text */
+    .catCell{display:grid;gap:6px}
+    .small{color:var(--muted);font-size:12px}
+    .hr{height:1px;background:var(--line);margin:10px 0}
+
+    .panel-2{display:grid; grid-template-columns: 1.1fr .9fr; gap:14px;}
+    @media(max-width:1100px){.panel-2{grid-template-columns:1fr}}
+
+    .chartWrap{display:grid; grid-template-columns: 260px 1fr; gap:12px; align-items:center;}
+    @media(max-width:520px){.chartWrap{grid-template-columns:1fr}}
+    canvas{width:260px;height:260px;max-width:100%}
+    .legend{display:grid;gap:6px}
+    .legend .item{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .dot{width:10px;height:10px;border-radius:999px;flex:0 0 10px}
+    .legend-left{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+    .legend-right{color:var(--text);font-size:13px;white-space:nowrap}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Budget Planner (MYR) — Monthly</h1>
+  <p>Expense categories are dropdowns per row, with custom categories supported.</p>
+</header>
+
+<main class="wrap">
+
+  <section class="topbar">
+    <div class="topbar-left">
+      <div>
+        <div class="label">Month</div>
+        <input id="monthPicker" type="month" />
+      </div>
+      <div>
+        <div class="label">Quick actions</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-small" id="copyPrevBtn" type="button">Copy previous month</button>
+          <button class="btn btn-small btn-danger" id="clearMonthBtn" type="button">Clear this month</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <button class="btn" id="exportCsvBtn" type="button">Export CSV</button>
+      <button class="btn" id="exportJsonBtn" type="button">Export JSON</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Summary</h2>
+    <div class="summary">
+      <div class="pill"><div class="label">Total Income</div><div class="value" id="incomeOut">RM 0.00</div></div>
+      <div class="pill"><div class="label">Total Deductions</div><div class="value warn" id="dedOut">RM 0.00</div></div>
+      <div class="pill"><div class="label">Total Expenses</div><div class="value warn" id="expOut">RM 0.00</div></div>
+      <div class="pill"><div class="label">Money Left</div><div class="value" id="leftOut">RM 0.00</div></div>
+    </div>
+    <div class="hr"></div>
+    <div class="small">Money Left = (Income − Deductions) − Expenses. Saved locally per month.</div>
+  </section>
+
+  <section class="panel-2">
+    <section class="card">
+      <h2>Expenses by Category (Pie)</h2>
+      <div class="chartWrap">
+        <canvas id="pie" width="260" height="260"></canvas>
+        <div>
+          <div class="small" style="margin-bottom:8px">Totals are grouped by category.</div>
+          <div class="legend" id="legend"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Categories</h2>
+      <div class="small">
+        Default: Housing • Utilities • Transport • Food • Debt/Loans • Family • Shopping • Insurance • Savings/Invest • Healthcare • Other<br/>
+        Custom categories you create will appear in every dropdown automatically.
+      </div>
+    </section>
+  </section>
+
+  <section class="grid">
+    <section class="card">
+      <h2>Income</h2>
+      <div class="row-3" style="margin-bottom:10px">
+        <input id="incomeName" type="text" placeholder="e.g., Basic salary / Side income" />
+        <input id="incomeAmt" type="number" step="0.01" min="0" placeholder="0.00" />
+        <button class="btn" id="addIncomeBtn" type="button">Add</button>
+      </div>
+      <table>
+        <thead><tr><th>Item</th><th class="num">Amount (RM)</th><th class="num"></th></tr></thead>
+        <tbody id="incomeBody"></tbody>
+        <tfoot><tr class="totals"><td>Total income</td><td class="num" id="incomeTotal">RM 0.00</td><td></td></tr></tfoot>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Deductions</h2>
+      <div class="row-3" style="margin-bottom:10px">
+        <input id="dedName" type="text" placeholder="e.g., EPF / SOCSO / Tax" />
+        <input id="dedAmt" type="number" step="0.01" min="0" placeholder="0.00" />
+        <button class="btn" id="addDedBtn" type="button">Add</button>
+      </div>
+      <table>
+        <thead><tr><th>Item</th><th class="num">Amount (RM)</th><th class="num"></th></tr></thead>
+        <tbody id="dedBody"></tbody>
+        <tfoot>
+          <tr class="totals"><td>Total deductions</td><td class="num" id="dedTotal">RM 0.00</td><td></td></tr>
+          <tr class="totals"><td>Net salary</td><td class="num" id="netTotal">RM 0.00</td><td></td></tr>
+        </tfoot>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Expenses</h2>
+
+      <div class="row-exp-add" style="margin-bottom:10px">
+        <input id="expName" type="text" placeholder="e.g., Rent / Food / Petrol" />
+        <select id="expCatAdd"></select>
+        <input id="expAmt" type="number" step="0.01" min="0" placeholder="0.00" />
+        <button class="btn" id="addExpBtn" type="button">Add</button>
+      </div>
+      <div class="small" style="margin-bottom:10px">To create a custom category: choose <strong>Custom…</strong> in any row, type it, and it will be added to the dropdown list.</div>
+
+      <table>
+        <thead><tr><th>Item</th><th>Category</th><th class="num">Amount (RM)</th><th class="num"></th></tr></thead>
+        <tbody id="expBody"></tbody>
+        <tfoot><tr class="totals"><td colspan="2">Total expenses</td><td class="num" id="expTotal">RM 0.00</td><td></td></tr></tfoot>
+      </table>
+    </section>
+  </section>
+
+</main>
+
+<script>
+  const APP_KEY_PREFIX = "budgetPlannerMYR_catSelect_month_";
+  const rm = new Intl.NumberFormat("ms-MY", { style: "currency", currency: "MYR" });
+
+  const DEFAULT_CATEGORIES = [
+    "Housing","Utilities","Transport","Food","Debt/Loans","Family","Shopping",
+    "Insurance","Savings/Invest","Healthcare","Other"
+  ];
+  const CUSTOM_SENTINEL = "__custom__";
+
+  const TEMPLATE_STATE = () => ({
+    income: [{ id: crypto.randomUUID(), name: "Basic Salary (Gross)", amount: 4100 }],
+    deductions: [
+      { id: crypto.randomUUID(), name: "EPF (Employee)", amount: 451.00 },
+      { id: crypto.randomUUID(), name: "SOCSO (Employee)", amount: 20.25 },
+      { id: crypto.randomUUID(), name: "EIS (Employee)", amount: 8.10 },
+      { id: crypto.randomUUID(), name: "Club Subscription", amount: 15.00 },
+    ],
+    expenses: [
+      { id: crypto.randomUUID(), name: "House rent", category: "Housing", amount: 1000 },
+      { id: crypto.randomUUID(), name: "WiFi", category: "Utilities", amount: 105 },
+      { id: crypto.randomUUID(), name: "Electric", category: "Utilities", amount: 180 },
+      { id: crypto.randomUUID(), name: "Water", category: "Utilities", amount: 17 },
+      { id: crypto.randomUUID(), name: "ASBF", category: "Savings/Invest", amount: 348.66 },
+      { id: crypto.randomUUID(), name: "Car loan", category: "Debt/Loans", amount: 600 },
+      { id: crypto.randomUUID(), name: "Shopee Pay", category: "Shopping", amount: 200 },
+      { id: crypto.randomUUID(), name: "Petrol", category: "Transport", amount: 180 },
+      { id: crypto.randomUUID(), name: "MARA", category: "Debt/Loans", amount: 200 },
+      { id: crypto.randomUUID(), name: "Parents", category: "Family", amount: 200 },
+    ]
+  });
+
+  // Month init
+  const monthPicker = document.getElementById("monthPicker");
+  const now = new Date();
+  monthPicker.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+
+  function keyForMonth(monthStr){ return APP_KEY_PREFIX + monthStr; }
+  function loadMonth(monthStr){
+    const raw = localStorage.getItem(keyForMonth(monthStr));
+    if(!raw) return TEMPLATE_STATE();
+    try { return JSON.parse(raw); } catch { return TEMPLATE_STATE(); }
+  }
+  function saveMonth(monthStr, state){
+    localStorage.setItem(keyForMonth(monthStr), JSON.stringify(state));
+  }
+  function prevMonthStr(monthStr){
+    const [Y, M] = monthStr.split("-").map(Number);
+    const d = new Date(Y, M-1, 1);
+    d.setMonth(d.getMonth()-1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  }
+
+  let currentMonth = monthPicker.value;
+  let state = loadMonth(currentMonth);
+  saveMonth(currentMonth, state);
+
+  // DOM refs
+  const incomeBody = document.getElementById("incomeBody");
+  const dedBody = document.getElementById("dedBody");
+  const expBody = document.getElementById("expBody");
+  const expCatAdd = document.getElementById("expCatAdd");
+
+  const pie = document.getElementById("pie");
+  const ctx = pie.getContext("2d");
+  const legend = document.getElementById("legend");
+
+  // Helpers
+  const sum = arr => arr.reduce((a,x)=>a+(Number(x.amount)||0),0);
+
+  function csvEscape(s){
+    const str = String(s ?? "");
+    if (/[",\n]/.test(str)) return `"${str.replaceAll('"','""')}"`;
+    return str;
+  }
+  function download(filename, text, mime="text/plain"){
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function ensureIds(){
+    state.income = (state.income||[]).map(x => ({ id: x.id || crypto.randomUUID(), name: x.name||"", amount: Number(x.amount||0) }));
+    state.deductions = (state.deductions||[]).map(x => ({ id: x.id || crypto.randomUUID(), name: x.name||"", amount: Number(x.amount||0) }));
+    state.expenses = (state.expenses||[]).map(x => ({
+      id: x.id || crypto.randomUUID(),
+      name: x.name || "",
+      category: (x.category || "Other").trim() || "Other",
+      amount: Number(x.amount || 0)
+    }));
+  }
+
+  // Build category list = default + custom found in expenses
+  function getAllCategories(){
+    const set = new Set(DEFAULT_CATEGORIES);
+    (state.expenses||[]).forEach(x => {
+      const c = (x.category || "").trim();
+      if(c) set.add(c);
+    });
+    // Keep "Other" last-ish? We'll just sort but keep defaults order preference:
+    const defaultsOrdered = DEFAULT_CATEGORIES.filter(c => set.has(c));
+    const custom = Array.from(set).filter(c => !DEFAULT_CATEGORIES.includes(c)).sort((a,b)=>a.localeCompare(b));
+    return [...defaultsOrdered, ...custom];
+  }
+
+  function fillCategorySelect(selectEl, selectedValue){
+    const cats = getAllCategories();
+    selectEl.innerHTML = "";
+
+    cats.forEach(cat => {
+      const opt = document.createElement("option");
+      opt.value = cat;
+      opt.textContent = cat;
+      selectEl.appendChild(opt);
+    });
+
+    const optCustom = document.createElement("option");
+    optCustom.value = CUSTOM_SENTINEL;
+    optCustom.textContent = "Custom…";
+    selectEl.appendChild(optCustom);
+
+    // Select current value if exists, else Other
+    const value = (selectedValue && cats.includes(selectedValue)) ? selectedValue : (selectedValue || "Other");
+    // If value isn't in list, keep it by adding temp option
+    if(value !== CUSTOM_SENTINEL && !cats.includes(value)){
+      const temp = document.createElement("option");
+      temp.value = value;
+      temp.textContent = value + " (custom)";
+      selectEl.insertBefore(temp, optCustom);
+    }
+    selectEl.value = value;
+  }
+
+  function refreshAllCategoryDropdowns(){
+    // Update "Add" dropdown
+    fillCategorySelect(expCatAdd, expCatAdd.value || "Other");
+
+    // Update each expense row dropdown, preserving selection
+    document.querySelectorAll("select[data-exp-cat='1']").forEach(sel => {
+      const current = sel.getAttribute("data-current") || sel.value;
+      fillCategorySelect(sel, current);
+    });
+  }
+
+  // Render rows
+  function makeRow(section, item){
+    const tr = document.createElement("tr");
+
+    const tdName = document.createElement("td");
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = item.name;
+    nameInput.addEventListener("input", e => {
+      item.name = e.target.value;
+      saveMonth(currentMonth, state);
+    });
+    tdName.appendChild(nameInput);
+
+    let tdCat = null;
+    if(section === "expenses"){
+      tdCat = document.createElement("td");
+
+      const wrap = document.createElement("div");
+      wrap.className = "catCell";
+
+      const sel = document.createElement("select");
+      sel.setAttribute("data-exp-cat","1");
+
+      // Keep current selection across refreshes
+      sel.setAttribute("data-current", item.category);
+
+      fillCategorySelect(sel, item.category);
+
+      const customInput = document.createElement("input");
+      customInput.type = "text";
+      customInput.placeholder = "Type custom category";
+      customInput.style.display = "none";
+
+      function commitCustomCategory(){
+        const val = (customInput.value || "").trim();
+        if(!val) return;
+        item.category = val;
+        sel.setAttribute("data-current", val);
+        saveMonth(currentMonth, state);
+        // Now that a new category exists, refresh all dropdowns to include it
+        refreshAllCategoryDropdowns();
+        drawPie();
+      }
+
+      sel.addEventListener("change", () => {
+        if(sel.value === CUSTOM_SENTINEL){
+          customInput.style.display = "block";
+          customInput.focus();
+        } else {
+          customInput.style.display = "none";
+          item.category = sel.value;
+          sel.setAttribute("data-current", sel.value);
+          saveMonth(currentMonth, state);
+          refreshAllCategoryDropdowns(); // ensure other rows include any new categories
+          drawPie();
+        }
+      });
+
+      customInput.addEventListener("keydown", e => {
+        if(e.key === "Enter"){
+          commitCustomCategory();
+          customInput.style.display = "none";
+          sel.value = item.category;
+        }
+      });
+      customInput.addEventListener("blur", () => {
+        // Commit on blur (optional behavior)
+        if(sel.value === CUSTOM_SENTINEL){
+          commitCustomCategory();
+          customInput.style.display = "none";
+          sel.value = item.category;
+        }
+      });
+
+      wrap.appendChild(sel);
+      wrap.appendChild(customInput);
+      tdCat.appendChild(wrap);
+    }
+
+    const tdAmt = document.createElement("td");
+    tdAmt.className = "num";
+    const amtInput = document.createElement("input");
+    amtInput.type = "number";
+    amtInput.step = "0.01";
+    amtInput.min = "0";
+    amtInput.value = item.amount;
+    amtInput.addEventListener("input", e => {
+      item.amount = Number(e.target.value || 0);
+      saveMonth(currentMonth, state);
+      recalc();
+    });
+    tdAmt.appendChild(amtInput);
+
+    const tdDel = document.createElement("td");
+    tdDel.className = "num";
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn btn-small btn-danger";
+    delBtn.type = "button";
+    delBtn.textContent = "Delete";
+    delBtn.addEventListener("click", () => {
+      state[section] = state[section].filter(x => x.id !== item.id);
+      saveMonth(currentMonth, state);
+      render();
+      recalc();
+    });
+    tdDel.appendChild(delBtn);
+
+    tr.appendChild(tdName);
+    if(tdCat) tr.appendChild(tdCat);
+    tr.appendChild(tdAmt);
+    tr.appendChild(tdDel);
+    return tr;
+  }
+
+  function render(){
+    ensureIds();
+
+    incomeBody.innerHTML = "";
+    dedBody.innerHTML = "";
+    expBody.innerHTML = "";
+
+    state.income.forEach(item => incomeBody.appendChild(makeRow("income", item)));
+    state.deductions.forEach(item => dedBody.appendChild(makeRow("deductions", item)));
+    state.expenses.forEach(item => expBody.appendChild(makeRow("expenses", item)));
+
+    refreshAllCategoryDropdowns();
+  }
+
+  // Calculations
+  function recalc(){
+    const incomeTotal = sum(state.income);
+    const dedTotal = sum(state.deductions);
+    const net = incomeTotal - dedTotal;
+    const expTotal = sum(state.expenses);
+    const left = net - expTotal;
+
+    document.getElementById("incomeTotal").textContent = rm.format(incomeTotal);
+    document.getElementById("dedTotal").textContent = rm.format(dedTotal);
+    document.getElementById("netTotal").textContent = rm.format(net);
+    document.getElementById("expTotal").textContent = rm.format(expTotal);
+
+    document.getElementById("incomeOut").textContent = rm.format(incomeTotal);
+    document.getElementById("dedOut").textContent = rm.format(dedTotal);
+    document.getElementById("expOut").textContent = rm.format(expTotal);
+
+    const leftOut = document.getElementById("leftOut");
+    leftOut.textContent = rm.format(left);
+    leftOut.classList.remove("good","warn","bad");
+    if(left >= 500) leftOut.classList.add("good");
+    else if(left >= 0) leftOut.classList.add("warn");
+    else leftOut.classList.add("bad");
+
+    drawPie();
+  }
+
+  // Pie by category
+  const PALETTE = ["#60a5fa","#34d399","#fbbf24","#fb7185","#a78bfa","#22c55e","#38bdf8","#f97316","#e879f9","#f43f5e","#84cc16","#06b6d4"];
+
+  function drawPie(){
+    const map = new Map();
+    (state.expenses || []).forEach(x => {
+      const amt = Number(x.amount||0);
+      if(amt <= 0) return;
+      const cat = (x.category || "Other").trim() || "Other";
+      map.set(cat, (map.get(cat) || 0) + amt);
+    });
+
+    let cats = Array.from(map.entries()).map(([name, amount]) => ({ name, amount }))
+      .sort((a,b)=>b.amount-a.amount);
+
+    const total = cats.reduce((a,x)=>a+x.amount,0);
+
+    ctx.clearRect(0,0,pie.width,pie.height);
+
+    if(total <= 0){
+      ctx.beginPath();
+      ctx.arc(130,130,95,0,Math.PI*2);
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 24;
+      ctx.stroke();
+      legend.innerHTML = `<div class="small">No expenses yet (add expenses with amount &gt; 0).</div>`;
+      return;
+    }
+
+    const MAX_SLICES = 8;
+    if(cats.length > MAX_SLICES){
+      const top = cats.slice(0, MAX_SLICES-1);
+      const other = cats.slice(MAX_SLICES-1).reduce((a,x)=>a+x.amount,0);
+      cats = [...top, { name: "Other", amount: other }];
+    }
+
+    const cx = 130, cy = 130, r = 100;
+    let start = -Math.PI/2;
+
+    cats.forEach((c, idx) => {
+      const angle = (c.amount / total) * Math.PI * 2;
+      const end = start + angle;
+
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,r,start,end);
+      ctx.closePath();
+      ctx.fillStyle = PALETTE[idx % PALETTE.length];
+      ctx.fill();
+
+      start = end;
+    });
+
+    // donut hole + center text
+    ctx.beginPath();
+    ctx.arc(cx,cy,55,0,Math.PI*2);
+    ctx.fillStyle = "rgba(18,26,51,0.95)";
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(233,238,255,0.92)";
+    ctx.font = "600 14px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Expenses", cx, cy-4);
+    ctx.fillStyle = "rgba(169,179,214,0.95)";
+    ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Arial";
+    ctx.fillText(rm.format(total), cx, cy+16);
+
+    legend.innerHTML = "";
+    cats.forEach((c, idx) => {
+      const row = document.createElement("div");
+      row.className = "item";
+
+      const left = document.createElement("div");
+      left.className = "legend-left";
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = PALETTE[idx % PALETTE.length];
+      const name = document.createElement("span");
+      name.textContent = c.name;
+      left.appendChild(dot); left.appendChild(name);
+
+      const right = document.createElement("div");
+      right.className = "legend-right";
+      const pct = ((c.amount/total)*100).toFixed(1);
+      right.textContent = `${rm.format(c.amount)} (${pct}%)`;
+
+      row.appendChild(left);
+      row.appendChild(right);
+      legend.appendChild(row);
+    });
+  }
+
+  // Add items
+  function addIncome(){
+    const nameEl = document.getElementById("incomeName");
+    const amtEl = document.getElementById("incomeAmt");
+    const name = nameEl.value.trim();
+    const amount = Number(amtEl.value || 0);
+    if(!name){ nameEl.focus(); return; }
+    state.income.push({ id: crypto.randomUUID(), name, amount });
+    nameEl.value=""; amtEl.value="";
+    saveMonth(currentMonth, state); render(); recalc();
+  }
+  function addDeduction(){
+    const nameEl = document.getElementById("dedName");
+    const amtEl = document.getElementById("dedAmt");
+    const name = nameEl.value.trim();
+    const amount = Number(amtEl.value || 0);
+    if(!name){ nameEl.focus(); return; }
+    state.deductions.push({ id: crypto.randomUUID(), name, amount });
+    nameEl.value=""; amtEl.value="";
+    saveMonth(currentMonth, state); render(); recalc();
+  }
+  function addExpense(){
+    const nameEl = document.getElementById("expName");
+    const amtEl = document.getElementById("expAmt");
+    const name = nameEl.value.trim();
+    const amount = Number(amtEl.value || 0);
+    let category = expCatAdd.value;
+
+    if(category === CUSTOM_SENTINEL){
+      const typed = prompt("Enter custom category name:");
+      if(!typed) return;
+      category = typed.trim() || "Other";
+    }
+
+    if(!name){ nameEl.focus(); return; }
+    state.expenses.push({ id: crypto.randomUUID(), name, category, amount });
+
+    nameEl.value=""; amtEl.value="";
+    saveMonth(currentMonth, state);
+    render();
+    recalc();
+  }
+
+  document.getElementById("addIncomeBtn").addEventListener("click", addIncome);
+  document.getElementById("addDedBtn").addEventListener("click", addDeduction);
+  document.getElementById("addExpBtn").addEventListener("click", addExpense);
+
+  // Month selector + actions
+  monthPicker.addEventListener("change", () => {
+    currentMonth = monthPicker.value;
+    state = loadMonth(currentMonth);
+    saveMonth(currentMonth, state);
+    render(); recalc();
+  });
+
+  document.getElementById("copyPrevBtn").addEventListener("click", () => {
+    const prev = prevMonthStr(currentMonth);
+    const prevState = loadMonth(prev);
+    state = structuredClone(prevState);
+    ["income","deductions","expenses"].forEach(section => {
+      state[section] = (state[section]||[]).map(x => ({...x, id: crypto.randomUUID()}));
+    });
+    saveMonth(currentMonth, state);
+    render(); recalc();
+    alert(`Copied data from ${prev} → ${currentMonth}`);
+  });
+
+  document.getElementById("clearMonthBtn").addEventListener("click", () => {
+    if(!confirm(`Clear all data for ${currentMonth}?`)) return;
+    localStorage.removeItem(keyForMonth(currentMonth));
+    state = TEMPLATE_STATE();
+    saveMonth(currentMonth, state);
+    render(); recalc();
+  });
+
+  // Export JSON
+  document.getElementById("exportJsonBtn").addEventListener("click", () => {
+    download(`budget-${currentMonth}.json`, JSON.stringify({ month: currentMonth, ...state }, null, 2), "application/json");
+  });
+
+  // Export CSV
+  document.getElementById("exportCsvBtn").addEventListener("click", () => {
+    const incomeTotal = sum(state.income);
+    const dedTotal = sum(state.deductions);
+    const net = incomeTotal - dedTotal;
+    const expTotal = sum(state.expenses);
+    const left = net - expTotal;
+
+    const rows = [];
+    rows.push(["Month", currentMonth]);
+    rows.push([]);
+    rows.push(["Summary","Amount (RM)"]);
+    rows.push(["Total Income", incomeTotal.toFixed(2)]);
+    rows.push(["Total Deductions", dedTotal.toFixed(2)]);
+    rows.push(["Net Salary", net.toFixed(2)]);
+    rows.push(["Total Expenses", expTotal.toFixed(2)]);
+    rows.push(["Money Left", left.toFixed(2)]);
+    rows.push([]);
+
+    function addSection(title, arr, includeCategory=false){
+      rows.push([title]);
+      if(includeCategory) rows.push(["Item","Category","Amount (RM)"]);
+      else rows.push(["Item","Amount (RM)"]);
+      (arr||[]).forEach(x => {
+        if(includeCategory) rows.push([x.name, x.category || "Other", Number(x.amount||0).toFixed(2)]);
+        else rows.push([x.name, Number(x.amount||0).toFixed(2)]);
+      });
+      rows.push([]);
+    }
+
+    addSection("Income", state.income, false);
+    addSection("Deductions", state.deductions, false);
+    addSection("Expenses", state.expenses, true);
+
+    const csv = rows.map(r => r.map(csvEscape).join(",")).join("\n");
+    download(`budget-${currentMonth}.csv`, csv, "text/csv");
+  });
+
+  // Init
+  ensureIds();
+  render();
+  recalc();
+</script>
+</body>
+</html>
